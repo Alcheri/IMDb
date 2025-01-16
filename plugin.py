@@ -19,7 +19,7 @@ from supybot.commands import *
 from supybot.i18n import PluginInternationalization
 
 
-_ = PluginInternationalization('IMDb')
+_ = PluginInternationalization("IMDb")
 
 
 def get_imdb_id(imdb_url, movie_name):
@@ -127,6 +127,7 @@ class IMDb(callbacks.Plugin):
     Add the help for "@plugin help IMDb" here
     This should describe *how* to use this plugin.
     """
+
     threaded = True
 
     def __init__(self, irc):
@@ -154,6 +155,7 @@ class IMDb(callbacks.Plugin):
                 "Movie not found on IMDb! Ensure correct spelling or try a different title.",
                 prefixNick=False,
             )
+
 
 Class = IMDb
 

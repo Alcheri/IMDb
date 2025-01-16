@@ -6,9 +6,11 @@
 ###
 
 from supybot import conf, registry
+
 try:
     from supybot.i18n import PluginInternationalization
-    _ = PluginInternationalization('IMDb')
+
+    _ = PluginInternationalization("IMDb")
 except:
     # Placeholder that allows to run the plugin on a bot
     # without the i18n module
@@ -21,15 +23,16 @@ def configure(advanced):
     # user or not.  You should effect your configuration by manipulating the
     # registry as appropriate.
     from supybot.questions import expect, anything, something, yn
-    conf.registerPlugin('IMDb', True)
+
+    conf.registerPlugin("IMDb", True)
 
 
-IMDb = conf.registerPlugin('IMDb')
+IMDb = conf.registerPlugin("IMDb")
 # This is where your configuration variables (if any) should go.  For example:
 # conf.registerGlobalValue(IMDb, 'someConfigVariableName',
 #     registry.Boolean(False, _("""Help for someConfigVariableName.""")))
 
-#XXX Default: False
+# XXX Default: False
 conf.registerChannelValue(
     IMDb,
     "enabled",
