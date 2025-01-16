@@ -27,6 +27,7 @@ headers = {
         Chrome/91.0.4472.124 Safari/537.36"
 }
 
+
 def get_imdb_id(imdb_url, movie_name):
     log.info(f"Fetching movie details for {movie_name}")
     try:
