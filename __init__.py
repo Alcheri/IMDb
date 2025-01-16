@@ -1,33 +1,25 @@
 ###
-# Copyright (c) 2024, Barry Suridge
+# Copyright (c) 2025, Barry Suridge
 # All rights reserved.
 #
 #
 ###
 
 """
-Dictionary: An English dictionary plugin.
+IMDb: Fetch movie details from IMDB.
 """
 
 import sys
-if sys.version_info < (3, 10):
-    raise RuntimeError("This plugin requires Python 3.10 or newer. Please upgrade your Python installation.")
 import supybot
 from supybot import world
 
-# Use this for the version of this plugin.
-__version__ = "22122024"
+__version__ = "15012025"
 
-# XXX Replace this with an appropriate author or supybot.Author instance.
-__author__ = supybot.Author('Barry Suridge', 'Alcheri',
-                            'barry.suridge@gmail.com')
+__author__ = supybot.Author("Barry Suridge", "Alcheri", "barry.suridge@gmail.com")
 
-# This is a dictionary mapping supybot.Author instances to lists of
-# contributions.
 __contributors__ = {}
 
-# This is a url where the most recent plugin package can be downloaded.
-__url__ = 'https://github.com/Alcheri/My-Limnoria-Plugins'
+__url__ = "https://github.com/Alcheri/IMDb"
 
 from . import config
 from . import plugin

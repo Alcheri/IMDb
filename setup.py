@@ -1,5 +1,5 @@
 ###
-# Copyright (c) 2024, Barry Suridge
+# Copyright (c) 2025, Barry Suridge
 # All rights reserved.
 #
 #
@@ -8,5 +8,8 @@
 from supybot.setup import plugin_setup
 
 plugin_setup(
-    'Dictionary',
+    "IMDb",
+    install_requires=[
+        "beautifulsoup4",
+    ],
 )

@@ -1,72 +1,161 @@
 ###
-# Copyright (c) 2024, Barry Suridge
+# Copyright (c) 2025, Barry Suridge
 # All rights reserved.
 #
 #
 ###
+import requests
+import json
 
-from supybot import utils, plugins, ircutils, callbacks, log
+# XXX: Install the following packages before running the script:
+try:
+    from bs4 import BeautifulSoup
+except ImportError as ie:
+    raise ImportError(f"Cannot import module: {ie}")
+
+import supybot.log as log
+from supybot import callbacks
 from supybot.commands import *
 from supybot.i18n import PluginInternationalization
 
 
-_ = PluginInternationalization('Dictionary')
+_ = PluginInternationalization('IMDb')
 
-import json
 
-from builtins import dict  # Ensure the built-in dict is used
+def get_imdb_id(imdb_url, movie_name):
+    log.info(f"Fetching movie details for {movie_name}")
+    try:
+        # Set headers to mimic a browser
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)\
+                Chrome/91.0.4472.124 Safari/537.36"
+        }
 
-headers = {
-    'User-Agent': 'Mozilla/5.0 (X11; Linux i686; rv:110.0) Gecko/20100101 Firefox/110.0'
-}
+        # Fetch the IMDb search page
+        response = requests.get(imdb_url, headers=headers)
+        response.raise_for_status()
 
-class Dictionary(callbacks.Plugin):
-    """An English dictionary plugin."""
+        # Parse the page content
+        soup = BeautifulSoup(response.text, "html.parser")
+
+        # Find the script with ID "__NEXT_DATA__"
+        script_tag = soup.find("script", id="__NEXT_DATA__", type="application/json")
+        if not script_tag:
+            raise ValueError("NEXT_DATA script not found.")
+
+        # Load the JSON content from the script
+        next_data = json.loads(script_tag.string)
+
+        # Navigate to the `titleResults` -> `results` section
+        title_results = (
+            next_data.get("props", {})
+            .get("pageProps", {})
+            .get("titleResults", {})
+            .get("results", [])
+        )
+
+        # Check if results are present
+        if not title_results:
+            raise ValueError("No title results found in NEXT_DATA.")
+
+        # Extract the first `tt` ID
+        tt_id = title_results[0].get("id")
+        return tt_id
+
+    except Exception as e:
+        log.error(f"Error: {e}")
+        return None
+
+
+def get_movie_details_by_id(imdb_id):
+    movie_url = f"https://www.imdb.com/title/{imdb_id}/"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)\
+            Chrome/91.0.4472.124 Safari/537.36"
+    }
+    response = requests.get(movie_url, headers=headers)
+
+    if response.status_code != 200:
+        log.error(
+            f"Debug: Failed to fetch movie details. HTTP Status: {response.status_code}"
+        )
+        return {
+            "Title": "Unknown Title",
+            "Year": "Unknown Year",
+            "Plot": "Unknown Plot",
+            "Genre": "Unknown Genre",
+            "Main Actors": "Unknown Actors",
+        }
+
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    # Find JSON-LD data
+    json_ld = soup.find("script", type="application/ld+json")
+    if not json_ld:
+        print("Debug: JSON-LD data not found.")
+        return {
+            "Title": "Unknown Title",
+            "Year": "Unknown Year",
+            "Plot": "Unknown Plot",
+            "Genre": "Unknown Genre",
+            "Main Actors": "Unknown Actors",
+        }
+
+    # Parse JSON-LD data
+    data = json.loads(json_ld.string)
+
+    # Extract movie details
+    title = data.get("name", "Unknown Title")
+    year = data.get("datePublished", "Unknown Year")
+    if year != "Unknown Year":
+        year = year.split("-")[0]  # Extract just the year
+    plot = data.get("description", "Unknown Plot")
+    genres = ", ".join(data.get("genre", ["Unknown Genre"]))
+    actors = ", ".join([actor.get("name", "") for actor in data.get("actor", [])[:5]])
+
+    return {
+        "Title": title,
+        "Year": year,
+        "Plot": plot,
+        "Genre": genres,
+        "Main Actors": actors,
+    }
+
+
+class IMDb(callbacks.Plugin):
+    """
+    Add the help for "@plugin help IMDb" here
+    This should describe *how* to use this plugin.
+    """
     threaded = True
 
     def __init__(self, irc):
         super().__init__(irc)
-    
-    @wrap(['text'])
-    def dict(self, irc, msg, args, input):
-        """<word>
-        Gives the meaning of the word.
+
+    @wrap(["text"])
+    def imdb(self, irc, msg, args, movie_name):
+        """<movie_name>
+
+        Fetch details of the given movie from IMDb.
         """
-        input = input.lower()
-        base_url = f'https://api.dictionaryapi.dev/api/v2/entries/en/{input}'
-    
-        try:
-            # Fetch data from the API
-            raw_response = utils.web.getUrl(base_url, headers=headers).decode('utf-8')
-            data = json.loads(raw_response, strict=False)
-        
-            if not isinstance(data, list):  # Valid check
-                irc.error("No definitions found for the given word.")
-                return
+        if not self.registryValue("enabled", msg.channel, irc.network):
+            return
+        search_url = f"https://www.imdb.com/find?q={movie_name}&s=tt"
 
-            first_element = data[0]
+        imdb_id = get_imdb_id(search_url, movie_name)
 
-            if not isinstance(first_element, dict):  # Valid check
-                irc.error("Unexpected response format from the API.")
-                return
+        if imdb_id:
+            details = get_movie_details_by_id(imdb_id)
+            irc.reply("Movie Details:", prefixNick=False)
+            for key, value in details.items():
+                irc.reply(f"{key}: {value}", prefixNick=False)
+        else:
+            irc.error(
+                "Movie not found on IMDb! Ensure correct spelling or try a different title.",
+                prefixNick=False,
+            )
 
-            try:
-                meaning = first_element['meanings'][0]
-                definition = meaning['definitions'][0]['definition']
-                part_of_speech = meaning['partOfSpeech']
-                response = f"{input} ({part_of_speech}): {definition}"
-                irc.reply(response, prefixNick=False)
-            except (KeyError, IndexError) as e:
-                irc.error(f"Error extracting definition: {e}", prefixNick=False)
-        except json.JSONDecodeError:
-            irc.error("Failed to parse the API's JSON response.", prefixNick=False)
-        except utils.web.Error as e:
-            irc.error(f"An error occurred while contacting the API: {e}", prefixNick=False)
-        except Exception as e:
-            irc.error(f"An unexpected error occurred: {e}", prefixNick=False)
-
-
-Class = Dictionary
+Class = IMDb
 
 
 # vim:set shiftwidth=4 softtabstop=4 expandtab textwidth=79:
