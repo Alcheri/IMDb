@@ -24,6 +24,7 @@ __url__ = "https://github.com/Alcheri/IMDb"
 from . import config
 from . import plugin
 from importlib import reload
+
 # In case we're being reloaded.
 reload(config)
 reload(plugin)
