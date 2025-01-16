@@ -21,16 +21,15 @@ from supybot.i18n import PluginInternationalization
 
 _ = PluginInternationalization("IMDb")
 
+# Set headers to mimic a browser
+headers = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)\
+        Chrome/91.0.4472.124 Safari/537.36"
+}
 
 def get_imdb_id(imdb_url, movie_name):
     log.info(f"Fetching movie details for {movie_name}")
     try:
-        # Set headers to mimic a browser
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)\
-                Chrome/91.0.4472.124 Safari/537.36"
-        }
-
         # Fetch the IMDb search page
         response = requests.get(imdb_url, headers=headers)
         response.raise_for_status()
@@ -69,10 +68,6 @@ def get_imdb_id(imdb_url, movie_name):
 
 def get_movie_details_by_id(imdb_id):
     movie_url = f"https://www.imdb.com/title/{imdb_id}/"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)\
-            Chrome/91.0.4472.124 Safari/537.36"
-    }
     response = requests.get(movie_url, headers=headers)
 
     if response.status_code != 200:
