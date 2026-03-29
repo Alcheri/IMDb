@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "limnoria-imdb"
+version = "1.0.0"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    { name = "Barry Suridge", email = "barry.suridge@gmail.com" }
+]
+dependencies = [
+    "beautifulsoup4",
+    "requests",
+]
+classifiers = [
+    "Environment :: Plugins",
+    "Programming Language :: Python :: 3",
+    "Topic :: Communications :: Chat",
+]
+
+[project.entry-points.'limnoria.plugins']
+IMDb = "limnoria_imdb"
+
+[tool.setuptools.package-dir]
+"limnoria_imdb" = "."
+"limnoria_imdb.local" = "local/"
+
+[tool.setuptools.package-data]
+"limnoria_imdb" = ["locales/*.po"]
