@@ -1,3 +1,5 @@
+<!-- IMDb plugin for Limnoria that returns details for the top title match. -->
+
 <h1 align ="center">IMDb</h1>
 
 <!-- README_HEADER:start -->
