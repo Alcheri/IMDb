@@ -64,6 +64,12 @@ Disable per channel:
 config channel #channel plugins.IMDb.enabled False
 ```
 
+Adjust the per-user lookup cooldown:
+
+```text
+config channel #channel plugins.IMDb.cooldownSeconds 5
+```
+
 ## Usage
 
 ```text
@@ -80,6 +86,7 @@ config channel #channel plugins.IMDb.enabled False
 
 - IMDb can return anti-bot/interstitial responses for full title pages.
 - When that happens, the plugin still returns a valid top match with available metadata.
+- Reply output is sanitised and truncated to keep IRC responses readable and safe.
 
 ## Troubleshooting
 

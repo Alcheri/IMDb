@@ -11,7 +11,7 @@ try:
     from supybot.i18n import PluginInternationalization
 
     _ = PluginInternationalization("IMDb")
-except:
+except ImportError:
     # Placeholder that allows to run the plugin on a bot
     # without the i18n module
     _ = lambda x: x
@@ -37,6 +37,15 @@ conf.registerChannelValue(
     IMDb,
     "enabled",
     registry.Boolean(False, """Should plugin work in this channel?"""),
+)
+
+conf.registerChannelValue(
+    IMDb,
+    "cooldownSeconds",
+    registry.NonNegativeInteger(
+        5,
+        _("""Sets the per-user IMDb lookup cooldown for this channel, in seconds."""),
+    ),
 )
 
 # vim:set shiftwidth=4 tabstop=4 expandtab textwidth=79:
