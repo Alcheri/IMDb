@@ -25,3 +25,10 @@ Thumbs.db
 # Logs and diagram sources
 *.mmd
 *.log
+
+# Supybot
+backup/
+conf/
+logs/
+data/
+tmp/

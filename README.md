@@ -1,4 +1,4 @@
-<!-- IMDb plugin for Limnoria that returns details for the top title match. -->
+<!-- IMDb plugin for Limnoria that returns OMDb-backed details for the top title match. -->
 
 <h1 align ="center">IMDb</h1>
 
@@ -21,14 +21,14 @@
 <!-- README_HEADER:end -->
 
 <p align="center">
-  <em>IMDb plugin for Limnoria that returns details for the top title match.</em>
+  <em>IMDb plugin for Limnoria that returns OMDb-backed details for the top title match.</em>
 </p>
 
 ## Features
 
-- Looks up the top IMDb title match for a query.
+- Looks up the top OMDb title match for a query.
 - Returns title, year, plot, genre/type, and main actors.
-- Gracefully falls back to suggestion data when IMDb blocks detailed page scraping.
+- Uses OMDb's API directly instead of scraping IMDb pages.
 
 ## Installation
 
@@ -51,6 +51,12 @@ Load the plugin:
 ```
 
 ## Configuration
+
+Set the OMDb API key:
+
+```text
+config plugins.IMDb.apiKey your-omdb-api-key
+```
 
 Enable per channel:
 
@@ -84,8 +90,8 @@ config channel #channel plugins.IMDb.cooldownSeconds 5
 
 ## Notes
 
-- IMDb can return anti-bot/interstitial responses for full title pages.
-- When that happens, the plugin still returns a valid top match with available metadata.
+- The plugin keeps its existing `IMDb` name and `!imdb` command for compatibility,
+  but now uses OMDb as the backend data source.
 - Reply output is sanitised and truncated to keep IRC responses readable and safe.
 
 ## Troubleshooting
@@ -110,6 +116,12 @@ config channel #channel plugins.IMDb.enabled
 /msg bot reload IMDb
 ```
 
+1. Confirm the OMDb API key is configured.
+
+```text
+config plugins.IMDb.apiKey
+```
+
 1. Reinstall plugin dependencies.
 
 ```bash
@@ -123,21 +135,5 @@ pip install --upgrade -r requirements.txt
 ```
 
 1. Check Limnoria logs for request or parsing errors if output is still missing.
-
-### Expected Degraded Behavior
-
-When IMDb blocks full title-page details, the plugin should still return a valid top match using suggestion metadata.
-
-```text
-<Barry> !imdb the witches of eastwick
-<Puss> Top Match Details:
-<Puss> Title: The Witches of Eastwick
-<Puss> Year: 1987
-<Puss> Plot: Plot unavailable (IMDb blocked detailed page lookup).
-<Puss> Genre: feature
-<Puss> Main Actors: Jack Nicholson, Cher
-```
-
-This response indicates fallback mode is working as intended.
 
 <p align="center">Copyright © MMXXVI, Barry Suridge</p>

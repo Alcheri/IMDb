@@ -51,7 +51,7 @@ class TestIMDbSecurity(unittest.TestCase):
         self.assertEqual(details["Genre"], "Action")
         self.assertEqual(details["Main Actors"], "Keanu Reeves Carrie-Anne Moss")
 
-    def test_search_imdb_title_rejects_unexpected_content_type(self):
+    def test_search_omdb_title_rejects_unexpected_content_type(self):
         response = MagicMock()
         response.headers = {"Content-Type": "text/html"}
         response.content = b"<html></html>"
@@ -59,20 +59,19 @@ class TestIMDbSecurity(unittest.TestCase):
 
         with patch.object(imdb_plugin.requests, "get", return_value=response):
             with patch.object(imdb_plugin.log, "warning") as mock_warning:
-                result = imdb_plugin.search_imdb_title("the matrix")
+                result = imdb_plugin.search_omdb_title("abc123", "the matrix")
 
         self.assertIsNone(result)
         mock_warning.assert_called_once()
 
-    def test_get_movie_details_by_id_returns_fallback_for_oversized_html(self):
+    def test_get_movie_details_by_id_returns_fallback_for_oversized_json(self):
         response = MagicMock()
-        response.status_code = 200
         response.headers = {
-            "Content-Type": "text/html; charset=utf-8",
-            "Content-Length": str(imdb_plugin.MAX_HTML_RESPONSE_BYTES + 1),
+            "Content-Type": "application/json; charset=utf-8",
+            "Content-Length": str(imdb_plugin.MAX_JSON_RESPONSE_BYTES + 1),
         }
         response.content = b"x"
-        response.text = "<html></html>"
+        response.raise_for_status.return_value = None
 
         fallback = {
             "Title": "Known Title",
@@ -84,7 +83,7 @@ class TestIMDbSecurity(unittest.TestCase):
 
         with patch.object(imdb_plugin.requests, "get", return_value=response):
             result = imdb_plugin.get_movie_details_by_id(
-                "tt0133093", fallback_details=fallback
+                "abc123", "tt0133093", fallback_details=fallback
             )
 
         self.assertEqual(result, fallback)
@@ -92,26 +91,20 @@ class TestIMDbSecurity(unittest.TestCase):
     def test_get_movie_details_by_id_sanitises_parsed_values(self):
         long_plot = "A" * (imdb_plugin.DETAIL_LIMITS["Plot"] + 50)
         response = MagicMock()
-        response.status_code = 200
-        response.headers = {"Content-Type": "text/html; charset=utf-8"}
+        response.headers = {"Content-Type": "application/json; charset=utf-8"}
         response.content = b"ok"
-        response.text = f"""
-            <html><head>
-            <script type="application/ld+json">{{
-                "name": "The\\u0002 Matrix\\nReloaded",
-                "datePublished": "2003-05-15",
-                "description": "{long_plot}",
-                "genre": ["Action", "Sci-Fi"],
-                "actor": [
-                    {{"name": "Keanu\\nReeves"}},
-                    {{"name": "Carrie-Anne Moss"}}
-                ]
-            }}</script>
-            </head></html>
-        """
+        response.raise_for_status.return_value = None
+        response.json.return_value = {
+            "Title": "The\x02 Matrix\nReloaded",
+            "Year": "2003",
+            "Plot": long_plot,
+            "Genre": "Action, Sci-Fi",
+            "Actors": "Keanu\nReeves, Carrie-Anne Moss",
+            "Response": "True",
+        }
 
         with patch.object(imdb_plugin.requests, "get", return_value=response):
-            result = imdb_plugin.get_movie_details_by_id("tt0234215")
+            result = imdb_plugin.get_movie_details_by_id("abc123", "tt0234215")
 
         self.assertEqual(result["Title"], "The Matrix Reloaded")
         self.assertEqual(result["Year"], "2003")
@@ -122,11 +115,10 @@ class TestIMDbSecurity(unittest.TestCase):
 
     def test_lookup_movie_details_uses_cache(self):
         suggestion = {
-            "id": "tt0133093",
-            "l": "The Matrix",
-            "y": 1999,
-            "s": "Keanu Reeves, Carrie-Anne Moss",
-            "q": "movie",
+            "imdbID": "tt0133093",
+            "Title": "The Matrix",
+            "Year": "1999",
+            "Type": "movie",
         }
         details = {
             "Title": "The Matrix",
@@ -137,18 +129,28 @@ class TestIMDbSecurity(unittest.TestCase):
         }
 
         with patch.object(
-            imdb_plugin, "search_imdb_title", return_value=suggestion
+            imdb_plugin, "search_omdb_title", return_value=suggestion
         ) as mock_search:
             with patch.object(
                 imdb_plugin, "get_movie_details_by_id", return_value=details
             ) as mock_details:
-                first = self.plugin._lookup_movie_details("The Matrix")
-                second = self.plugin._lookup_movie_details("The Matrix")
+                first = self.plugin._lookup_movie_details("The Matrix", "abc123")
+                second = self.plugin._lookup_movie_details("The Matrix", "abc123")
 
         self.assertEqual(first, details)
         self.assertEqual(second, details)
-        mock_search.assert_called_once_with("The Matrix")
-        mock_details.assert_called_once()
+        mock_search.assert_called_once_with("abc123", "The Matrix")
+        mock_details.assert_called_once_with(
+            "abc123",
+            "tt0133093",
+            fallback_details={
+                "Title": "The Matrix",
+                "Year": "1999",
+                "Plot": "Plot unavailable (OMDb detail lookup failed).",
+                "Genre": "Movie",
+                "Main Actors": "Unknown Actors",
+            },
+        )
 
     def test_cooldown_is_per_user(self):
         self.plugin.registryValue = lambda name, *args: 5

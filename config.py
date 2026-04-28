@@ -28,9 +28,12 @@ def configure(advanced):
 
 
 IMDb = conf.registerPlugin("IMDb")
-# This is where your configuration variables (if any) should go.  For example:
-# conf.registerGlobalValue(IMDb, 'someConfigVariableName',
-#     registry.Boolean(False, _("""Help for someConfigVariableName.""")))
+
+conf.registerGlobalValue(
+    IMDb,
+    "apiKey",
+    registry.String("", _("""Sets the API key for OMDb."""), private=True),
+)
 
 # XXX Default: False
 conf.registerChannelValue(

@@ -5,19 +5,11 @@
 #
 ###
 import builtins
-import json
 import re
 import threading
 import time
-from urllib.parse import quote
 
 import requests
-
-# XXX: Install the following packages before running the script:
-try:
-    from bs4 import BeautifulSoup
-except ImportError as ie:
-    raise ImportError(f"Cannot import module: {ie}")
 
 import supybot.ircutils as ircutils
 import supybot.log as log
@@ -27,17 +19,16 @@ from supybot.i18n import PluginInternationalization
 
 _ = PluginInternationalization("IMDb")
 
-HEADERS = {"User-Agent": "Limnoria-IMDb/1.0 (+https://github.com/Alcheri/IMDb)"}
+HEADERS = {"User-Agent": "Limnoria-IMDb/1.1 (+https://github.com/Alcheri/IMDb)"}
+OMDB_API_URL = "https://www.omdbapi.com/"
 REQUEST_TIMEOUT_SECONDS = 10
 CACHE_TTL_SECONDS = 600
 MAX_JSON_RESPONSE_BYTES = 256 * 1024
-MAX_HTML_RESPONSE_BYTES = 512 * 1024
 MAX_LOG_TEXT_LENGTH = 120
 CONTROL_CHARS_RE = re.compile(r"[\x00-\x1f\x7f]")
 WHITESPACE_RE = re.compile(r"\s+")
 JSON_CONTENT_TYPES = ("application/json", "text/json")
-HTML_CONTENT_TYPES = ("text/html", "application/xhtml+xml")
-PREFERRED_TYPES = {"movie", "feature", "tvSeries", "tvMiniSeries", "tvMovie"}
+PREFERRED_TYPES = {"movie", "series", "episode"}
 DETAIL_DEFAULTS = {
     "Title": "Unknown Title",
     "Year": "Unknown Year",
@@ -96,135 +87,107 @@ def _response_within_size_limit(response, max_bytes):
     return len(response.content) <= max_bytes
 
 
-def _details_from_suggestion(suggestion_item):
-    title = suggestion_item.get("l", DETAIL_DEFAULTS["Title"])
-    year = suggestion_item.get("y", DETAIL_DEFAULTS["Year"])
-    cast = suggestion_item.get("s", DETAIL_DEFAULTS["Main Actors"])
-    kind = (
-        suggestion_item.get("q")
-        or suggestion_item.get("qid")
-        or DETAIL_DEFAULTS["Genre"]
-    )
+def _coalesce_omdb_value(value, default):
+    cleaned = _clean_text(value)
+    if not cleaned or cleaned.upper() == "N/A":
+        return default
+    return cleaned
+
+
+def _request_omdb(params):
+    try:
+        response = requests.get(
+            OMDB_API_URL,
+            params=params,
+            headers=HEADERS,
+            timeout=REQUEST_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+    except requests.RequestException as e:
+        log.error(f"OMDb request failed: {e}")
+        return None
+
+    if not _content_type_allowed(response, JSON_CONTENT_TYPES):
+        log.warning("OMDb response had unexpected content type.")
+        return None
+
+    if not _response_within_size_limit(response, MAX_JSON_RESPONSE_BYTES):
+        log.warning("OMDb response exceeded the size limit.")
+        return None
+
+    try:
+        return response.json()
+    except ValueError as e:
+        log.error(f"OMDb JSON parse failed: {e}")
+        return None
+
+
+def _details_from_search_result(search_item):
+    title = search_item.get("Title", DETAIL_DEFAULTS["Title"])
+    year = search_item.get("Year", DETAIL_DEFAULTS["Year"])
+    kind = search_item.get("Type", DETAIL_DEFAULTS["Genre"]).title()
 
     return _sanitise_details(
         {
             "Title": title,
             "Year": str(year),
-            "Plot": "Plot unavailable (IMDb blocked detailed page lookup).",
+            "Plot": "Plot unavailable (OMDb detail lookup failed).",
             "Genre": kind,
-            "Main Actors": cast,
+            "Main Actors": DETAIL_DEFAULTS["Main Actors"],
         }
     )
 
 
-def search_imdb_title(movie_name):
-    """Return top IMDb suggestion entry for a title search."""
+def search_omdb_title(api_key, movie_name):
+    """Return the top OMDb search entry for a title search."""
     if not movie_name or not movie_name.strip():
         return None
 
     query = movie_name.strip()
-    first_char = next((ch.lower() for ch in query if ch.isalnum()), "x")
-    encoded_query = quote(query)
-    suggestion_url = (
-        f"https://v3.sg.media-imdb.com/suggestion/{first_char}/{encoded_query}.json"
-    )
+    params = {"apikey": api_key, "s": query}
 
-    log.info(f"Fetching IMDb suggestions for {_log_safe_text(query)}")
-    try:
-        response = requests.get(
-            suggestion_url, headers=HEADERS, timeout=REQUEST_TIMEOUT_SECONDS
-        )
-        response.raise_for_status()
-    except requests.RequestException as e:
-        log.error(f"IMDb suggestion request failed: {e}")
+    log.info(f"Fetching OMDb search results for {_log_safe_text(query)}")
+    payload = _request_omdb(params)
+    if not payload:
         return None
 
-    if not _content_type_allowed(response, JSON_CONTENT_TYPES):
-        log.warning("IMDb suggestion response had unexpected content type.")
+    if payload.get("Response") != "True":
+        log.warning(f"OMDb search did not return a match for {_log_safe_text(query)}.")
         return None
 
-    if not _response_within_size_limit(response, MAX_JSON_RESPONSE_BYTES):
-        log.warning("IMDb suggestion response exceeded the size limit.")
-        return None
-
-    try:
-        payload = response.json()
-    except ValueError as e:
-        log.error(f"IMDb suggestion JSON parse failed: {e}")
-        return None
-
-    results = payload.get("d", [])
+    results = payload.get("Search", [])
     if not results:
         return None
 
-    tt_results = [item for item in results if str(item.get("id", "")).startswith("tt")]
+    tt_results = [
+        item for item in results if str(item.get("imdbID", "")).startswith("tt")
+    ]
     if not tt_results:
         return None
 
     for item in tt_results:
-        if item.get("qid") in PREFERRED_TYPES or item.get("q") in PREFERRED_TYPES:
+        if item.get("Type") in PREFERRED_TYPES:
             return item
 
     return tt_results[0]
 
 
-def get_movie_details_by_id(imdb_id, fallback_details=None):
+def get_movie_details_by_id(api_key, imdb_id, fallback_details=None):
     fallback_details = _sanitise_details(fallback_details or DETAIL_DEFAULTS)
-    movie_url = f"https://www.imdb.com/title/{imdb_id}/"
-    try:
-        response = requests.get(
-            movie_url, headers=HEADERS, timeout=REQUEST_TIMEOUT_SECONDS
-        )
-    except requests.RequestException as e:
-        log.warning(f"IMDb title request failed for {imdb_id}: {e}")
+    payload = _request_omdb({"apikey": api_key, "i": imdb_id, "plot": "short"})
+    if not payload:
         return fallback_details
 
-    if response.status_code != 200:
-        log.warning(f"IMDb title page blocked/unavailable ({response.status_code})")
+    if payload.get("Response") != "True":
+        error = payload.get("Error", "Unknown OMDb error")
+        log.warning(f"OMDb detail lookup failed for {imdb_id}: {error}")
         return fallback_details
 
-    if not _content_type_allowed(response, HTML_CONTENT_TYPES):
-        log.warning(
-            "IMDb title page had unexpected content type; using fallback details."
-        )
-        return fallback_details
-
-    if not _response_within_size_limit(response, MAX_HTML_RESPONSE_BYTES):
-        log.warning("IMDb title page exceeded the size limit; using fallback details.")
-        return fallback_details
-
-    soup = BeautifulSoup(response.text, "html.parser")
-    json_ld = soup.find("script", type="application/ld+json")
-    if not json_ld:
-        log.warning("IMDb JSON-LD data not found; using fallback details.")
-        return fallback_details
-
-    try:
-        data = json.loads(json_ld.string)
-    except (TypeError, json.JSONDecodeError) as e:
-        log.warning(f"IMDb JSON-LD parse failed: {e}")
-        return fallback_details
-
-    title = data.get("name", fallback_details["Title"])
-    year = data.get("datePublished", fallback_details["Year"])
-    if year != DETAIL_DEFAULTS["Year"]:
-        year = str(year).split("-", 1)[0]
-    plot = data.get("description", fallback_details["Plot"])
-
-    genre_value = data.get("genre")
-    if isinstance(genre_value, list):
-        genres = ", ".join(str(genre) for genre in genre_value)
-    elif isinstance(genre_value, str):
-        genres = genre_value
-    else:
-        genres = fallback_details["Genre"]
-
-    actor_list = data.get("actor", [])
-    actors = ", ".join(
-        actor.get("name", "") for actor in actor_list[:5] if isinstance(actor, dict)
-    )
-    if not actors:
-        actors = fallback_details["Main Actors"]
+    title = _coalesce_omdb_value(payload.get("Title"), fallback_details["Title"])
+    year = _coalesce_omdb_value(payload.get("Year"), fallback_details["Year"])
+    plot = _coalesce_omdb_value(payload.get("Plot"), fallback_details["Plot"])
+    genres = _coalesce_omdb_value(payload.get("Genre"), fallback_details["Genre"])
+    actors = _coalesce_omdb_value(payload.get("Actors"), fallback_details["Main Actors"])
 
     return _sanitise_details(
         {
@@ -259,7 +222,7 @@ class CooldownTracker:
 
 class IMDb(callbacks.Plugin):
     """
-    A simple plugin to fetch movie details from the Internet Movie Database (IMDb)
+    A simple plugin to fetch title details from OMDb while keeping the IMDb command
     """
 
     threaded = True
@@ -309,21 +272,23 @@ class IMDb(callbacks.Plugin):
         key = (irc.network, channel, getattr(msg, "prefix", ""))
         return self.cooldowns.remaining(key, cooldown)
 
-    def _lookup_movie_details(self, movie_name):
+    def _lookup_movie_details(self, movie_name, api_key):
         cached_details = self._get_cached_details(movie_name)
         if cached_details is not None:
             return cached_details
 
-        suggestion = search_imdb_title(movie_name)
-        if not suggestion:
+        search_result = search_omdb_title(api_key, movie_name)
+        if not search_result:
             return None
 
-        imdb_id = suggestion.get("id")
+        imdb_id = search_result.get("imdbID")
         if not imdb_id:
             return {}
 
-        fallback_details = _details_from_suggestion(suggestion)
-        details = get_movie_details_by_id(imdb_id, fallback_details=fallback_details)
+        fallback_details = _details_from_search_result(search_result)
+        details = get_movie_details_by_id(
+            api_key, imdb_id, fallback_details=fallback_details
+        )
         self._set_cached_details(movie_name, details)
         return details
 
@@ -331,10 +296,15 @@ class IMDb(callbacks.Plugin):
     def imdb(self, irc, msg, args, movie_name):
         """<movie_name>
 
-        Fetch details of the given movie from IMDb.
+        Fetch details of the given title from OMDb.
         """
         channel = self._channel_from_msg(msg)
         if not self.registryValue("enabled", channel, irc.network):
+            return
+
+        api_key = self.registryValue("apiKey").strip()
+        if not api_key:
+            irc.error("OMDb API key is not configured for IMDb.", prefixNick=False)
             return
 
         details = self._get_cached_details(movie_name)
@@ -346,11 +316,11 @@ class IMDb(callbacks.Plugin):
                     prefixNick=False,
                 )
                 return
-            details = self._lookup_movie_details(movie_name)
+            details = self._lookup_movie_details(movie_name, api_key)
 
         if details == {}:
             irc.error(
-                "Movie found, but IMDb did not provide a valid title ID.",
+                "Movie found, but OMDb did not provide a valid IMDb title ID.",
                 prefixNick=False,
             )
             return
@@ -362,7 +332,7 @@ class IMDb(callbacks.Plugin):
             return
 
         irc.error(
-            "Movie not found on IMDb! Ensure correct spelling or try a different title.",
+            "Movie not found via OMDb! Ensure correct spelling or try a different title.",
             prefixNick=False,
         )
 
