@@ -187,7 +187,9 @@ def get_movie_details_by_id(api_key, imdb_id, fallback_details=None):
     year = _coalesce_omdb_value(payload.get("Year"), fallback_details["Year"])
     plot = _coalesce_omdb_value(payload.get("Plot"), fallback_details["Plot"])
     genres = _coalesce_omdb_value(payload.get("Genre"), fallback_details["Genre"])
-    actors = _coalesce_omdb_value(payload.get("Actors"), fallback_details["Main Actors"])
+    actors = _coalesce_omdb_value(
+        payload.get("Actors"), fallback_details["Main Actors"]
+    )
 
     return _sanitise_details(
         {
