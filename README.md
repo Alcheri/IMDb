@@ -3,21 +3,12 @@
 <h1 align ="center">IMDb</h1>
 
 <!-- README_HEADER:start -->
-<p align="center">
-  <a href="https://github.com/Alcheri/IMDb/actions/workflows/tests.yml">
-    <img src="https://github.com/Alcheri/IMDb/actions/workflows/tests.yml/badge.svg" alt="Tests">
-  </a>
-  <a href="https://github.com/Alcheri/IMDb/actions/workflows/lint.yml">
-    <img src="https://github.com/Alcheri/IMDb/actions/workflows/lint.yml/badge.svg" alt="Lint">
-  </a>
-  <a href="https://github.com/Alcheri/IMDb/security/code-scanning">
-    <img src="https://github.com/Alcheri/IMDb/actions/workflows/codeql.yml/badge.svg" alt="CodeQL">
-  </a>
-  <img src="https://img.shields.io/badge/python-3.9%2B-blue.svg" alt="Python">
-  <img src="https://img.shields.io/badge/code%20style-black-000000.svg" alt="Code style: black">
-  <img src="https://img.shields.io/badge/limnoria-compatible-brightgreen.svg" alt="Limnoria">
-  <img src="https://img.shields.io/badge/License-BSD_3--Clause-blue.svg" alt="License">
-</p>
+[![Tests][tests-badge]][tests-link]
+[![Lint][lint-badge]][lint-link]
+[![CodeQL][codeql-badge]][codeql-link]
+![Python][python-badge]
+![Black][black-badge]
+![Limnoria][limnoria-badge]
 <!-- README_HEADER:end -->
 
 <p align="center">
@@ -137,3 +128,17 @@ pip install --upgrade -r requirements.txt
 1. Check Limnoria logs for request or parsing errors if output is still missing.
 
 <p align="center">Copyright © MMXXVI, Barry Suridge</p>
+
+<!-- Badge reference definitions -->
+[tests-badge]: https://github.com/Alcheri/IMDb/actions/workflows/tests.yml/badge.svg
+[tests-link]: https://github.com/Alcheri/IMDb/actions/workflows/tests.yml
+
+[lint-badge]: https://github.com/Alcheri/IMDb/actions/workflows/lint.yml/badge.svg
+[lint-link]: https://github.com/Alcheri/IMDb/actions/workflows/lint.yml
+
+[codeql-badge]: https://github.com/Alcheri/IMDb/actions/workflows/codeql.yml/badge.svg
+[codeql-link]: https://github.com/Alcheri/IMDb/security/code-scanning
+
+[python-badge]: https://img.shields.io/badge/python-3.9%2B-blue.svg
+[black-badge]: https://img.shields.io/badge/code%20style-black-000000.svg
+[limnoria-badge]: https://img.shields.io/badge/limnoria-compatible-brightgreen.svg
