@@ -47,7 +47,9 @@ conf.registerChannelValue(
     "cooldownSeconds",
     registry.NonNegativeInteger(
         5,
-        _("""Sets the per-user IMDb lookup cooldown for this channel, in seconds."""),
+        _(
+            """Sets the per-user IMDb lookup cooldown for this channel, in seconds."""
+        ),
     ),
 )
 

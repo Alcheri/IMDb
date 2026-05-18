@@ -49,7 +49,9 @@ class TestIMDbSecurity(unittest.TestCase):
         self.assertEqual(details["Title"], "The Matrix Reloaded")
         self.assertEqual(details["Plot"], "Plot with weird spacing")
         self.assertEqual(details["Genre"], "Action")
-        self.assertEqual(details["Main Actors"], "Keanu Reeves Carrie-Anne Moss")
+        self.assertEqual(
+            details["Main Actors"], "Keanu Reeves Carrie-Anne Moss"
+        )
 
     def test_search_omdb_title_rejects_unexpected_content_type(self):
         response = MagicMock()
@@ -109,8 +111,12 @@ class TestIMDbSecurity(unittest.TestCase):
         self.assertEqual(result["Title"], "The Matrix Reloaded")
         self.assertEqual(result["Year"], "2003")
         self.assertEqual(result["Genre"], "Action, Sci-Fi")
-        self.assertEqual(result["Main Actors"], "Keanu Reeves, Carrie-Anne Moss")
-        self.assertLessEqual(len(result["Plot"]), imdb_plugin.DETAIL_LIMITS["Plot"])
+        self.assertEqual(
+            result["Main Actors"], "Keanu Reeves, Carrie-Anne Moss"
+        )
+        self.assertLessEqual(
+            len(result["Plot"]), imdb_plugin.DETAIL_LIMITS["Plot"]
+        )
         self.assertTrue(result["Plot"].endswith("..."))
 
     def test_lookup_movie_details_uses_cache(self):
@@ -134,8 +140,12 @@ class TestIMDbSecurity(unittest.TestCase):
             with patch.object(
                 imdb_plugin, "get_movie_details_by_id", return_value=details
             ) as mock_details:
-                first = self.plugin._lookup_movie_details("The Matrix", "abc123")
-                second = self.plugin._lookup_movie_details("The Matrix", "abc123")
+                first = self.plugin._lookup_movie_details(
+                    "The Matrix", "abc123"
+                )
+                second = self.plugin._lookup_movie_details(
+                    "The Matrix", "abc123"
+                )
 
         self.assertEqual(first, details)
         self.assertEqual(second, details)

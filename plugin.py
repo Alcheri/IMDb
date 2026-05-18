@@ -19,7 +19,9 @@ from supybot.i18n import PluginInternationalization
 
 _ = PluginInternationalization("IMDb")
 
-HEADERS = {"User-Agent": "Limnoria-IMDb/1.1 (+https://github.com/Alcheri/IMDb)"}
+HEADERS = {
+    "User-Agent": "Limnoria-IMDb/1.1 (+https://github.com/Alcheri/IMDb)"
+}
 OMDB_API_URL = "https://www.omdbapi.com/"
 REQUEST_TIMEOUT_SECONDS = 10
 CACHE_TTL_SECONDS = 600
@@ -63,7 +65,9 @@ def _sanitise_details(details):
     safe_details = {}
     source = details or {}
     for key, default in DETAIL_DEFAULTS.items():
-        cleaned = _clean_text(source.get(key, default), limit=DETAIL_LIMITS[key])
+        cleaned = _clean_text(
+            source.get(key, default), limit=DETAIL_LIMITS[key]
+        )
         safe_details[key] = cleaned or default
     return safe_details
 
@@ -152,7 +156,9 @@ def search_omdb_title(api_key, movie_name):
         return None
 
     if payload.get("Response") != "True":
-        log.warning(f"OMDb search did not return a match for {_log_safe_text(query)}.")
+        log.warning(
+            f"OMDb search did not return a match for {_log_safe_text(query)}."
+        )
         return None
 
     results = payload.get("Search", [])
@@ -160,7 +166,9 @@ def search_omdb_title(api_key, movie_name):
         return None
 
     tt_results = [
-        item for item in results if str(item.get("imdbID", "")).startswith("tt")
+        item
+        for item in results
+        if str(item.get("imdbID", "")).startswith("tt")
     ]
     if not tt_results:
         return None
@@ -183,10 +191,14 @@ def get_movie_details_by_id(api_key, imdb_id, fallback_details=None):
         log.warning(f"OMDb detail lookup failed for {imdb_id}: {error}")
         return fallback_details
 
-    title = _coalesce_omdb_value(payload.get("Title"), fallback_details["Title"])
+    title = _coalesce_omdb_value(
+        payload.get("Title"), fallback_details["Title"]
+    )
     year = _coalesce_omdb_value(payload.get("Year"), fallback_details["Year"])
     plot = _coalesce_omdb_value(payload.get("Plot"), fallback_details["Plot"])
-    genres = _coalesce_omdb_value(payload.get("Genre"), fallback_details["Genre"])
+    genres = _coalesce_omdb_value(
+        payload.get("Genre"), fallback_details["Genre"]
+    )
     actors = _coalesce_omdb_value(
         payload.get("Actors"), fallback_details["Main Actors"]
     )
@@ -261,7 +273,10 @@ class IMDb(callbacks.Plugin):
             return
 
         with self._cache_lock:
-            self._cache[cache_key] = (_sanitise_details(details), time.monotonic())
+            self._cache[cache_key] = (
+                _sanitise_details(details),
+                time.monotonic(),
+            )
 
     def _channel_from_msg(self, msg):
         return getattr(msg, "channel", None) or (
@@ -306,7 +321,9 @@ class IMDb(callbacks.Plugin):
 
         api_key = self.registryValue("apiKey").strip()
         if not api_key:
-            irc.error("OMDb API key is not configured for IMDb.", prefixNick=False)
+            irc.error(
+                "OMDb API key is not configured for IMDb.", prefixNick=False
+            )
             return
 
         details = self._get_cached_details(movie_name)
