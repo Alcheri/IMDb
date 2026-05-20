@@ -90,6 +90,27 @@ class TestIMDbSecurity(unittest.TestCase):
 
         self.assertEqual(result, fallback)
 
+    def test_request_failure_logging_does_not_include_api_key_url(self):
+        response = MagicMock()
+        response.status_code = 401
+        error = imdb_plugin.requests.HTTPError(
+            "401 Client Error: Unauthorized for url: "
+            "https://www.omdbapi.com/?apikey=secret&s=matrix",
+            response=response,
+        )
+
+        with (
+            patch.object(imdb_plugin.requests, "get", side_effect=error),
+            patch.object(imdb_plugin.log, "error") as mock_error,
+        ):
+            result = imdb_plugin.search_omdb_title("secret", "matrix")
+
+        self.assertIsNone(result)
+        logged = mock_error.call_args.args[0]
+        self.assertIn("HTTP status 401", logged)
+        self.assertNotIn("secret", logged)
+        self.assertNotIn("apikey", logged)
+
     def test_get_movie_details_by_id_sanitises_parsed_values(self):
         long_plot = "A" * (imdb_plugin.DETAIL_LIMITS["Plot"] + 50)
         response = MagicMock()
@@ -161,6 +182,34 @@ class TestIMDbSecurity(unittest.TestCase):
                 "Main Actors": "Unknown Actors",
             },
         )
+
+    def test_validate_movie_name_rejects_overlong_title(self):
+        with self.assertRaises(ValueError) as context:
+            imdb_plugin._validate_movie_name(
+                "x" * (imdb_plugin.MAX_TITLE_LENGTH + 1)
+            )
+
+        self.assertEqual(str(context.exception), "Movie title is too long.")
+
+    def test_cache_evicts_oldest_entry_when_full(self):
+        self.plugin._cache = {
+            f"title-{index}": (
+                imdb_plugin.DETAIL_DEFAULTS,
+                float(index),
+            )
+            for index in range(imdb_plugin.MAX_CACHE_ENTRIES)
+        }
+
+        with patch.object(imdb_plugin.time, "monotonic", return_value=100.0):
+            self.plugin._set_cached_details(
+                "new title", imdb_plugin.DETAIL_DEFAULTS
+            )
+
+        self.assertEqual(
+            len(self.plugin._cache), imdb_plugin.MAX_CACHE_ENTRIES
+        )
+        self.assertNotIn("title-0", self.plugin._cache)
+        self.assertIn("new title", self.plugin._cache)
 
     def test_cooldown_is_per_user(self):
         self.plugin.registryValue = lambda name, *args: 5

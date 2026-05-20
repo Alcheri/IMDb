@@ -25,6 +25,8 @@ HEADERS = {
 OMDB_API_URL = "https://www.omdbapi.com/"
 REQUEST_TIMEOUT_SECONDS = 10
 CACHE_TTL_SECONDS = 600
+MAX_CACHE_ENTRIES = 128
+MAX_TITLE_LENGTH = 200
 MAX_JSON_RESPONSE_BYTES = 256 * 1024
 MAX_LOG_TEXT_LENGTH = 120
 CONTROL_CHARS_RE = re.compile(r"[\x00-\x1f\x7f]")
@@ -59,6 +61,24 @@ def _clean_text(value, limit=None):
 def _log_safe_text(value):
     cleaned = _clean_text(value, limit=MAX_LOG_TEXT_LENGTH)
     return cleaned or "<empty>"
+
+
+def _log_request_failure(error):
+    response = getattr(error, "response", None)
+    status_code = getattr(response, "status_code", None)
+    if status_code is not None:
+        log.error(f"OMDb request failed with HTTP status {status_code}.")
+    else:
+        log.error(f"OMDb request failed: {error.__class__.__name__}")
+
+
+def _validate_movie_name(movie_name):
+    cleaned = _clean_text(movie_name)
+    if not cleaned:
+        raise ValueError("Movie title is required.")
+    if len(cleaned) > MAX_TITLE_LENGTH:
+        raise ValueError("Movie title is too long.")
+    return cleaned
 
 
 def _sanitise_details(details):
@@ -108,7 +128,7 @@ def _request_omdb(params):
         )
         response.raise_for_status()
     except requests.RequestException as e:
-        log.error(f"OMDb request failed: {e}")
+        _log_request_failure(e)
         return None
 
     if not _content_type_allowed(response, JSON_CONTENT_TYPES):
@@ -273,9 +293,23 @@ class IMDb(callbacks.Plugin):
             return
 
         with self._cache_lock:
+            now = time.monotonic()
+            expired_keys = [
+                key
+                for key, (_details, timestamp) in self._cache.items()
+                if now - timestamp >= CACHE_TTL_SECONDS
+            ]
+            for key in expired_keys:
+                del self._cache[key]
+            while len(self._cache) >= MAX_CACHE_ENTRIES:
+                oldest_key = min(
+                    self._cache,
+                    key=lambda key: self._cache[key][1],
+                )
+                del self._cache[oldest_key]
             self._cache[cache_key] = (
                 _sanitise_details(details),
-                time.monotonic(),
+                now,
             )
 
     def _channel_from_msg(self, msg):
@@ -324,6 +358,12 @@ class IMDb(callbacks.Plugin):
             irc.error(
                 "OMDb API key is not configured for IMDb.", prefixNick=False
             )
+            return
+
+        try:
+            movie_name = _validate_movie_name(movie_name)
+        except ValueError as e:
+            irc.error(str(e), prefixNick=False)
             return
 
         details = self._get_cached_details(movie_name)
