@@ -14,7 +14,7 @@ import requests
 import supybot.ircutils as ircutils
 import supybot.log as log
 from supybot import callbacks
-from supybot.commands import *
+from supybot.commands import wrap
 from supybot.i18n import PluginInternationalization
 
 _ = PluginInternationalization("IMDb")

@@ -37,6 +37,12 @@ extend-exclude = '''
 )/
 '''
 
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+explicit_package_bases = true
+exclude = "(__init__|test)\\.py"
+
 [tool.setuptools.package-dir]
 "limnoria_imdb" = "."
 "limnoria_imdb.local" = "local/"
