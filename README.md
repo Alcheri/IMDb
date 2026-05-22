@@ -139,6 +139,6 @@ pip install --upgrade -r requirements.txt
 [codeql-badge]: https://github.com/Alcheri/IMDb/actions/workflows/codeql.yml/badge.svg
 [codeql-link]: https://github.com/Alcheri/IMDb/security/code-scanning
 
-[python-badge]: https://img.shields.io/badge/python-3.9%2B-blue.svg
+[python-badge]: https://img.shields.io/badge/python-3.11.2-blue.svg
 [black-badge]: https://img.shields.io/badge/code%20style-black-000000.svg
 [limnoria-badge]: https://img.shields.io/badge/limnoria-compatible-brightgreen.svg
